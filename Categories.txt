@@ -2,4 +2,6 @@ I'm thinking that some things will be needed for RL implementation. Like an app 
 
 Otherwise. Some Extensions ( Unity specific ) , and other tools that are platform/framework agnostic but in the mindset of Unity/Games would be good here.. 
 
-Now I just have to get them out of that binder....  
+Now I just have to get them out of that binder.... 
+
+First will be controls schemes from unity projects. I want to start with boxy brown first. Just because.s
