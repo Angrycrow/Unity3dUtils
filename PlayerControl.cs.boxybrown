@@ -1,0 +1,292 @@
+﻿using UnityEngine;
+using System.Collections;
+
+public class PlayerControl : MonoBehaviour {
+
+	// Some tweaking and derping. 
+
+	public float Accel, MaxSpeed, jumpVel, jumpMin, jumpMax; 
+	public float Speed, Drag; 
+	Vector3 moveVector; 
+	Vector2 jumpForce = new Vector2(); 
+	public 	bool grounded, p1Jump, p2Jump, p3Jump;
+
+	// linkin. 
+	GameManager gm;
+
+	// Use this for initialization
+	void Start () 
+	{	
+		grounded 	= false;
+		p1Jump 		= false;
+		p2Jump 		= false;
+		p3Jump 		= false;
+
+		gm 			= GameObject.Find ("GameManager").GetComponent<GameManager>(); 
+
+	}
+
+	public void Reset()
+	{
+		jumpForce.y = 1f; 
+		Speed = 0f; 
+	}
+
+
+	// Make sure we ground on the real. 
+	// and the other cases for colliding are bullet proof! 
+
+	void OnCollisionEnter2D ( Collision2D other)
+	{
+		if (other.gameObject.tag == "floor") 
+		{
+			// Check the floor when we land on it with a bottom ray. 
+			Vector2 footPoint = new Vector2(transform.position.x , transform.position.y - 0.5f); 
+			RaycastHit2D rHit = Physics2D.Raycast( footPoint, -Vector2.up, 0.25f, 1, -1f, 1f); 
+			
+			if ( rHit.collider != null && moveVector.y == 0f )
+			{
+				Vector3 testR; 
+				testR.x = footPoint.x;
+				testR.y = footPoint.y;
+				// testR.z = 0f; 
+				Debug.DrawRay( testR, -Vector3.up, Color.red, 1f); 
+				
+				grounded 	= true; 
+				p1Jump 		= true;
+				p2Jump 		= true;
+				p3Jump 		= true;
+				
+				transform.parent = other.gameObject.transform; 
+				
+			}
+
+			// check the sides to make sure we don't bust on through or get stuck inside...  
+			float dir = -1f;
+			if ( moveVector.x >= 0f)
+			{
+				dir = 1f;
+			}
+			
+			Vector2 sOffset = new Vector2(transform.position.x+0.5f*dir, transform.position.y); 
+			RaycastHit2D sHit = Physics2D.Raycast ( sOffset, Vector2.right * Speed, 0.01f,1 ,-1f, 1f); 
+
+			if ( sHit.collider != null )
+			{
+			//	print( sHit.collider.name );
+				//			Vector3 testR; 
+				//			testR.x = sOffset.x;
+				//			testR.y = sOffset.y;
+				//			testR.z = 0f;
+				//			
+				//			Debug.DrawRay( testR, Vector3.right*dir, Color.yellow, 1f); 
+				// Special case kind of stuff. boxes firstly. 
+				if ( sHit.collider.tag == "floor")
+				{
+					moveVector.x = 0f; 
+				}
+			} 
+		} 
+	}
+
+
+	void OnCollisionStay2D(Collision2D other)
+	{
+		// we're also going to need to offset the side check. so we don't hit boxy again. 
+		// get the negative/ positive move vector.. 
+		
+		float dir = -1f;
+		if ( moveVector.x >= 0f)
+		{
+			dir = 1f;
+		}
+		
+		Vector2 sOffset = new Vector2(transform.position.x+0.5f*dir, transform.position.y); 
+		RaycastHit2D sHit = Physics2D.Raycast ( sOffset, Vector2.right * Speed, 0.01f,1 ,-1f, 1f); 
+
+		if ( sHit.collider != null )
+		{
+			//print( sHit.collider.name );
+//			Vector3 testR; 
+//			testR.x = sOffset.x;
+//			testR.y = sOffset.y;
+//			testR.z = 0f;
+//			
+//			Debug.DrawRay( testR, Vector3.right*dir, Color.yellow, 1f); 
+			// Special case kind of stuff. boxes firstly. 
+			if ( sHit.collider.name == "PushBox" )
+			{
+				Speed = Speed*0.9f; 
+				Vector3 pushVector = new Vector3(Speed, 0, 0);
+				sHit.collider.transform.position += pushVector;
+			}
+			else if ( sHit.collider.tag == "floor")
+			{
+				Speed = 0f; 
+			}
+		} 
+
+	}
+
+	// but will it stack? // pass keycode and bool. 
+	IEnumerator jumpEnv( bool isJump, KeyCode k )
+	{
+		//print("jump begins"); 
+		float t = 0f; 
+		rigidbody2D.AddForce(jumpForce/2f, ForceMode2D.Impulse);
+		transform.parent = null;  
+//		print ("impulsed"); 
+		
+		while (Input.GetKey(k) && isJump)
+		{
+
+			if ( t < jumpMax )
+			{
+				rigidbody2D.AddForce(jumpForce, ForceMode2D.Force);	
+			}
+			else
+			{
+				jumpForce.y = 0f; 
+				isJump = false; 
+				//print ("reached max height ");
+				break; 
+			}
+
+			t +=  jumpVel * Time.deltaTime; 
+
+			yield return new WaitForSeconds(0.001f);
+			
+		}
+
+	}	
+
+
+	void FixedUpdate() // for physics! 
+	{
+
+		// probably will have to do the same for floors. 
+		float h1 = Input.GetAxis ("HorizP1");  
+		float h2 = Input.GetAxis ("HorizP2"); 
+		float h3 = Input.GetAxis ("HorizP3");  
+		
+		// how many people are playing?
+		// divide the input!!! 
+		float MetaHorizontal = (h1 + h2 + h3)/gm.numPlayers;  
+		
+		// Flipping First! 
+		Vector3 bScale = new Vector3 (1,1,1);
+		
+		// Jump Filtering.. So I want to remove the add force with some smarter stuff. 
+		moveVector.y /= gm.numPlayers; 
+		jumpForce.y = jumpVel; 
+		
+		// TODO: Broken.. Grounded has to be paired with something that allows everyone to jump... 
+		if (grounded) 
+		{	
+
+			// Horiz movement
+			
+			if ( MetaHorizontal != 0f )
+			{
+				if ( Mathf.Abs(Speed) < MaxSpeed )
+				{
+					Speed += MetaHorizontal *  Accel * Time.deltaTime ; 
+					
+					if ( Mathf.Abs( Speed - MetaHorizontal) > 1f)
+					{
+						//						print("sliding"); 
+						Speed /= Drag; 
+					}
+				}
+				else
+				{
+					Speed = MetaHorizontal*MaxSpeed;  
+				}
+			}
+			else
+			{
+				if ( Mathf.Abs(Speed) != 0f )
+				{
+					
+					Speed = Speed / Drag; 
+					
+					if( Mathf.Abs(Speed) < 0.0001f)
+					{
+						Speed = 0f; 
+					}
+				}
+				
+			}
+
+			// Flipping to face 
+			
+			if (MetaHorizontal < 0f) 
+			{
+				
+				bScale.x = -1; 
+				transform.FindChild ("boxyart").transform.localScale = bScale; 
+				
+			} 
+			else if ( MetaHorizontal > 0f)  
+			{
+				
+				bScale.x = 1; 
+				transform.FindChild ("boxyart").transform.localScale = bScale;
+			} 
+			
+			// either land or let the others jump. 
+			moveVector.x = Speed; 
+			
+		} 
+		else 
+		{
+			
+			// Fall really. 
+			//print("something isn't doing anything"); 
+		}
+		
+
+		
+
+		transform.position += moveVector;
+
+	}
+	
+	// Update is called once per frame
+	// TODO: add rules/gate for multiple players.. we can start with 3 but I want this to be more dynamic. 
+	void Update () 
+	{
+		if (grounded) 
+		{	
+			// jumping 
+			
+			if(Input.GetKeyDown(KeyCode.Joystick1Button0) && p1Jump)
+			{
+				
+				//				print ("Jump1"); 
+				StartCoroutine( jumpEnv( p1Jump ,KeyCode.Joystick1Button0)); 
+				p1Jump = false; 
+				grounded = false; 
+				
+			}
+			
+			if(Input.GetKey(KeyCode.Joystick2Button0) && p2Jump)
+			{
+				
+				//			print ("Jump2");
+				StartCoroutine( jumpEnv(p2Jump, KeyCode.Joystick2Button0)); 
+				p1Jump = false; 
+				grounded = false; 
+			}
+			
+			if(Input.GetKeyDown(KeyCode.Space) && p3Jump)
+			{
+				StartCoroutine( jumpEnv( p3Jump,  KeyCode.Space)); 
+				//				print ("Jump3");
+				p3Jump = false; 
+				grounded = false; 
+			}
+		}
+	}
+
+}

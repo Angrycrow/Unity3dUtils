@@ -1,3 +1,1 @@
-Decanting the good implementations from the expirements and past wheel implementations. 
-
-Something that I've wanted to do since BluePoint was a thing. 
+Build Up my collection of re-useable experiments in game development. 
